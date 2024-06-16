@@ -89,44 +89,65 @@ instance Monad DequeWrapper where
   DequeWrapper q >>= f = DequeWrapper (q >>= \x -> let DequeWrapper q' = f x in q')
 
 ---- Section 3: Calculator and traverse
---class Monad f => CalculatorError f where
---  divideByZero :: f Int
---  missingVariable :: String -> f Int
---
---runCalculator :: CalculatorError f => Map String Int -> Expr -> f Int
---
----- Instances to implement:
---instance CalculatorError Maybe
---
---data Err = DivByZero | MissingVar String deriving (Show, Eq)
---instance CalculatorError (Either Err)
---
---data Defaults
---  = Defaults
---  -- This replaces the entire division result, not just the denominator!
---  { defaultForDivisionByZero :: Int
---  , defaultForVariable :: String -> Int
---  }
---instance CalculatorError (Reader Defaults)
---
----- From the lectures:
---newtype Reader r a = Reader {runReader :: r -> a}
---instance Functor (Reader r) where
---  fmap f r = Reader $ f . runReader r
---instance Applicative (Reader r) where
---  pure = Reader . const
---  liftA2 f ra rb = Reader $ \r -> f (runReader ra r) (runReader rb r)
---instance Monad (Reader r) where
---  ra >>= f = Reader $ \r -> runReader (f $ runReader ra r) r
---
---data Expr
---  = Val Int
---  | Var String
---  | Add Expr Expr
---  | Sub Expr Expr
---  | Mul Expr Expr
---  | Div Expr Expr
---  deriving (Show, Eq)
---
+class Monad f => CalculatorError f where
+  divideByZero :: f Int
+  missingVariable :: String -> f Int
+
+runCalculator :: CalculatorError f => Map String Int -> Expr -> f Int
+runCalculator _ (Val x) = return x
+runCalculator vars (Var x) =
+  case M.lookup x vars of
+    Just val -> return val
+    Nothing  -> missingVariable x
+runCalculator vars (Add e1 e2) = liftA2 (+) (runCalculator vars e1) (runCalculator vars e2)
+runCalculator vars (Sub e1 e2) = liftA2 (-) (runCalculator vars e1) (runCalculator vars e2)
+runCalculator vars (Mul e1 e2) = liftA2 (*) (runCalculator vars e1) (runCalculator vars e2)
+runCalculator vars (Div e1 e2) = do
+  numerator <- runCalculator vars e1
+  denominator <- runCalculator vars e2
+  if denominator == 0
+    then divideByZero
+    else return (numerator `div` denominator)
+
+-- Instances to implement:
+instance CalculatorError Maybe where
+  divideByZero = Nothing
+  missingVariable _ = Nothing
+
+data Err = DivByZero | MissingVar String deriving (Show, Eq)
+instance CalculatorError (Either Err) where
+  divideByZero = Left DivByZero
+  missingVariable var = Left (MissingVar var)
+
+
+data Defaults
+  = Defaults
+  -- This replaces the entire division result, not just the denominator!
+  { defaultForDivisionByZero :: Int
+  , defaultForVariable :: String -> Int
+  }
+instance CalculatorError (Reader Defaults) where
+  divideByZero = Reader $ \d -> defaultForDivisionByZero d
+  missingVariable var = Reader $ \d -> defaultForVariable d var
+
+-- From the lectures:
+newtype Reader r a = Reader {runReader :: r -> a}
+instance Functor (Reader r) where
+  fmap f r = Reader $ f . runReader r
+instance Applicative (Reader r) where
+  pure = Reader . const
+  liftA2 f ra rb = Reader $ \r -> f (runReader ra r) (runReader rb r)
+instance Monad (Reader r) where
+  ra >>= f = Reader $ \r -> runReader (f $ runReader ra r) r
+
+data Expr
+  = Val Int
+  | Var String
+  | Add Expr Expr
+  | Sub Expr Expr
+  | Mul Expr Expr
+  | Div Expr Expr
+  deriving (Show, Eq)
+
 ---- Section 4: Hangman
 --hangman :: String -> IO Int
