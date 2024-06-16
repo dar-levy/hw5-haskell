@@ -14,6 +14,7 @@ data Deque a = Deque [a] [a]
 
 instance Eq a => Eq (Deque a) where
   Deque l r == Deque l' r' = l ++ reverse r == l' ++ reverse r'
+
 instance Show a => Show (Deque a) where
   show (Deque l r) = show (l ++ reverse r)
 
@@ -36,8 +37,20 @@ popr = \case
   Deque l [] -> popr $ Deque [] (reverse l)
 
 instance Semigroup (Deque a) where
+  Deque l1 r1 <> Deque l2 r2 = Deque (l1 ++ reverse r1 ++ l2) r2
+
 instance Monoid (Deque a) where
+  mempty = empty
+
 instance Foldable Deque where
+  foldMap f (Deque l r) = foldMap f (l ++ reverse r)
+
 instance Functor Deque where
+  fmap f (Deque l r) = Deque (fmap f l) (fmap f r)
+
 instance Applicative Deque where
+  pure x = Deque [x] []
+  Deque fs rs <*> Deque xs ys = Deque (liftA2 ($) fs xs ++ liftA2 ($) fs (reverse ys) ++ liftA2 ($) (reverse rs) xs ++ liftA2 ($) (reverse rs) (reverse ys)) []
+
 instance Monad Deque where
+  Deque l r >>= f = foldMap f (l ++ reverse r)

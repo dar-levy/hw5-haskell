@@ -21,8 +21,8 @@ import Data.Ord (Down (..))
 import Data.Semigroup (Arg (..), Max (..), Min (..))
 import Data.Set (Set)
 import Data.Set qualified as S
---import Deque (Deque)
---import Deque qualified as DQ
+import Deque (Deque)
+import Deque qualified as DQ
 
 data FoldMapFunc a m result = FoldMapFunc {agg :: a -> m, finalize :: m -> result}
 
@@ -66,15 +66,28 @@ fmminBy f = FoldMapFunc (\x -> Min (Just (f x, x))) (fmap snd . getMin)
 fmtoList :: FoldMapFunc a [a] [a]
 fmtoList = FoldMapFunc (:[]) id
 
----- Section 2: Deque instances (Don't forget to implement the instances in Deque.hs as well!)
---newtype DequeWrapper a = DequeWrapper (Deque a) deriving (Show, Eq)
---instance Semigroup (DequeWrapper a)
---instance Monoid (DequeWrapper a)
---instance Foldable DequeWrapper
---instance Functor DequeWrapper
---instance Applicative DequeWrapper
---instance Monad DequeWrapper
---
+-- Section 2: Deque instances (Don't forget to implement the instances in Deque.hs as well!)
+newtype DequeWrapper a = DequeWrapper (Deque a) deriving (Show, Eq)
+
+instance Semigroup (DequeWrapper a) where
+  DequeWrapper q1 <> DequeWrapper q2 = DequeWrapper (q1 <> q2)
+
+instance Monoid (DequeWrapper a) where
+  mempty = DequeWrapper DQ.empty
+
+instance Foldable DequeWrapper where
+  foldMap f (DequeWrapper q) = foldMap f q
+
+instance Functor DequeWrapper where
+  fmap f (DequeWrapper q) = DequeWrapper (fmap f q)
+
+instance Applicative DequeWrapper where
+  pure x = DequeWrapper (pure x)
+  DequeWrapper fs <*> DequeWrapper xs = DequeWrapper (fs <*> xs)
+
+instance Monad DequeWrapper where
+  DequeWrapper q >>= f = DequeWrapper (q >>= \x -> let DequeWrapper q' = f x in q')
+
 ---- Section 3: Calculator and traverse
 --class Monad f => CalculatorError f where
 --  divideByZero :: f Int
