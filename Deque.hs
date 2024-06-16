@@ -50,7 +50,7 @@ instance Functor Deque where
 
 instance Applicative Deque where
   pure x = Deque [x] []
-  Deque fs rs <*> Deque xs ys = Deque (fs <*> xs) (reverse rs <*> reverse ys)
+  Deque fs rs <*> Deque xs ys = Deque (liftA2 ($) fs xs ++ liftA2 ($) fs (reverse ys) ++ liftA2 ($) (reverse rs) xs ++ liftA2 ($) (reverse rs) (reverse ys)) []
 
 instance Monad Deque where
   Deque l r >>= f = foldMap f (l ++ reverse r)
