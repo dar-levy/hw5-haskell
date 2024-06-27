@@ -23,6 +23,7 @@ import Data.Set (Set)
 import Data.Set qualified as S
 import Deque (Deque)
 import Deque qualified as DQ
+import System.Console.Haskeline
 
 data FoldMapFunc a m result = FoldMapFunc {agg :: a -> m, finalize :: m -> result}
 
@@ -150,4 +151,87 @@ data Expr
   deriving (Show, Eq)
 
 ---- Section 4: Hangman
---hangman :: String -> IO Int
+hangman :: String -> IO Int
+hangman str = do
+
+  let hidden_str = map (hideChar . toLower) str
+  let optimal = S.size (S.delete ' ' (S.fromList str))
+  num_guesses <- playGame str "Guess a letter: " hidden_str S.empty S.empty 0
+  return (num_guesses - optimal)
+
+
+playGame :: String -> String -> String -> Set Char -> Set Char -> Int -> IO Int
+playGame str prompt hidden_str good_guessed_chars bad_guessed_chars num_guesses = do
+
+  putStrLn hidden_str
+  putStr prompt
+  c <- getChar'
+  let guess = toLower c
+  --putStrLn ""
+
+  -- Bonus char
+  if guess == '?' then
+    -- Here we create a set of the whole alphabet, and do diff set operation on the good and bad guesses sets
+    -- i.e., ({"abcdefghijklmnopqrstuvwxy"} - {good_guessed_chars}) - {bad_guessed_chars}
+    let remaining_chars = quicksort (S.toList (S.difference (S.difference (S.fromList "abcdefghijklmnopqrstuvwxyz") good_guessed_chars) bad_guessed_chars)) in do
+      putStr "Remaining letters: ["
+      putStr remaining_chars
+      putStr "]"
+      putStrLn ""
+      playGame str "Guess a letter: " hidden_str good_guessed_chars bad_guessed_chars num_guesses
+  
+  -- Invalid char case
+  else if not (isLowerLetter guess) then do
+    --putStrLn ""
+    putStr "Invalid letter guess "
+    putStr [c]
+    putStr "!"
+    putStrLn ""
+    playGame str "Try again: " hidden_str good_guessed_chars bad_guessed_chars num_guesses
+  
+  -- Character was already gussed correctly
+  else if (S.member guess good_guessed_chars) then
+    playGame str "Guess a letter: " hidden_str good_guessed_chars bad_guessed_chars num_guesses
+  
+  -- New or incorrect character guess
+  else
+    let new_hidden_str = unhideString str hidden_str guess in
+    
+    -- Full string was revealed
+    if new_hidden_str == str then do
+      putStrLn "Very good, the word is:"
+      putStrLn new_hidden_str
+      return (num_guesses + 1)
+    
+    -- Guess does not appear in the string, we add it to the bad guess set
+    else if hidden_str == new_hidden_str then do
+      putStrLn "Wrong guess!"
+      playGame str "Try again: " new_hidden_str good_guessed_chars (S.insert guess bad_guessed_chars) (num_guesses + 1)
+    
+    -- Guess does appear, we add it to the good guess set
+    else
+      playGame str "Guess a letter: " new_hidden_str (S.insert guess good_guessed_chars) bad_guessed_chars (num_guesses + 1)
+
+isLowerLetter :: Char -> Bool
+isLowerLetter c = (code >= 97 && code <= 122)
+  where code = ord c
+
+hideChar :: Char -> Char
+hideChar c = if isLowerLetter c then '_' else c
+
+unhideString :: String -> String -> Char -> String
+unhideString [] _ _ = []
+unhideString _ [] _ = []
+unhideString (c:original) (h:hidden) guess
+ | (toLower c) == guess = c : (unhideString original hidden guess)
+ | otherwise = h : (unhideString original hidden guess)
+
+quicksort :: (Ord a) => [a] -> [a]  
+quicksort [] = []  
+quicksort (x:xs) =   
+    let smallerSorted = quicksort [a | a <- xs, a <= x]  
+        biggerSorted = quicksort [a | a <- xs, a > x]  
+    in  smallerSorted ++ [x] ++ biggerSorted
+
+getChar' :: IO Char
+getChar' = runInputT defaultSettings $ fromJust <$> getInputChar ""
