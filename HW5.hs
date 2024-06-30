@@ -52,17 +52,17 @@ fmlength = FoldMapFunc (const 1) getSum
 fmnull :: FoldMapFunc a Any Bool
 fmnull = FoldMapFunc (const (Any True)) (not . getAny)
 
-fmmaximum :: Ord a => FoldMapFunc a (Max (Maybe a)) (Maybe a)
-fmmaximum = FoldMapFunc (Max . Just) getMax
+fmmaximum :: Ord a => FoldMapFunc a (Maybe (Max a)) (Maybe a)
+fmmaximum = FoldMapFunc (Just . Max) (fmap getMax)
 
-fmminimum :: Ord a => FoldMapFunc a (Min (Maybe a)) (Maybe a)
-fmminimum = FoldMapFunc (Min . Just) getMin
+fmminimum :: Ord a => FoldMapFunc a (Maybe (Min a)) (Maybe a)
+fmminimum = FoldMapFunc (Just . Min) (fmap getMin)
 
-fmmaxBy :: Ord b => (a -> b) -> FoldMapFunc a (Max (Maybe (b, a))) (Maybe a)
-fmmaxBy f = FoldMapFunc (\x -> Max (Just (f x, x))) (fmap snd . getMax)
+fmmaxBy :: Ord b => (a -> b) -> FoldMapFunc a (Maybe (Max (b, a))) (Maybe a)
+fmmaxBy f = FoldMapFunc (Just . Max . (\x -> (f x, x))) (fmap (snd . getMax))
 
-fmminBy :: Ord b => (a -> b) -> FoldMapFunc a (Min (Maybe (b, a))) (Maybe a)
-fmminBy f = FoldMapFunc (\x -> Min (Just (f x, x))) (fmap snd . getMin)
+fmminBy :: Ord b => (a -> b) -> FoldMapFunc a (Maybe (Min (b, a))) (Maybe a)
+fmminBy f = FoldMapFunc (Just . Min . (\x -> (f x, x))) (fmap (snd . getMin))
 
 fmtoList :: FoldMapFunc a [a] [a]
 fmtoList = FoldMapFunc (:[]) id
@@ -155,9 +155,9 @@ hangman :: String -> IO Int
 hangman str = do
 
   let hidden_str = map (hideChar . toLower) str
-  let optimal = S.size (S.delete ' ' (S.fromList str))
+  let optimal = S.size (S.delete ' ' (S.fromList (map toLower str)))
   num_guesses <- playGame str "Guess a letter: " hidden_str S.empty S.empty 0
-  return (num_guesses - optimal)
+  if num_guesses < optimal then return 0 else return (num_guesses - optimal)
 
 
 playGame :: String -> String -> String -> Set Char -> Set Char -> Int -> IO Int
